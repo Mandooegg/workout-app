@@ -1,11 +1,7 @@
-import {
-  supabase, getUser, loginWithGoogle, loginWithEmail,
-  signUp, logout,
-  loadChecks, saveCheck,
-  loadWeights, saveWeight,
-  loadMemo, saveMemo,
-  loadWeekDone, saveWeekDone
-} from './supabase.js'
+const SUPABASE_URL = 'https://wiqbzwcuaodryxkrfcfj.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpcWJ6d2N1YW9kcnl4a3JmY2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzIyOTgsImV4cCI6MjA5NzAwODI5OH0.YLRL3hkfRGdPglr1VcH80YoD9_VIxPD3VNHNKJi1VXU'
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const EXERCISES = [
   '스쿼트 3세트',
@@ -18,15 +14,15 @@ const EXERCISES = [
 
 let state = {
   today: new Date().toISOString().split('T')[0],
-  checks: [],       // [{exercise_index, is_done}]
-  weights: [],      // [{date, weight_kg}]
+  checks: [],
+  weights: [],
   memo: '',
-  weekDone: [],     // [date strings]
+  weekDone: [],
 }
 
 // --- Auth ---
 async function initAuth() {
-  const user = await getUser()
+  const { data: { user } } = await sb.auth.getUser()
   if (user) {
     showApp()
     await loadAll()
@@ -34,7 +30,7 @@ async function initAuth() {
     showLogin()
   }
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  sb.auth.onAuthStateChange((_event, session) => {
     if (session?.user) {
       showApp()
       loadAll()
@@ -54,20 +50,24 @@ function showApp() {
   document.getElementById('app-screen').style.display = 'block'
 }
 
-// --- Data Loading ---
+// --- Data ---
 async function loadAll() {
   setLoading(true)
   try {
-    const [checks, weights, memo, weekDone] = await Promise.all([
-      loadChecks(state.today),
-      loadWeights(),
-      loadMemo(state.today),
-      loadWeekDone(),
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
+
+    const [checksRes, weightsRes, memoRes, weekDoneRes] = await Promise.all([
+      sb.from('workout_checks').select('*').eq('user_id', user.id).eq('date', state.today),
+      sb.from('weight_logs').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(30),
+      sb.from('workout_memos').select('memo').eq('user_id', user.id).eq('date', state.today).maybeSingle(),
+      sb.from('week_done').select('date').eq('user_id', user.id),
     ])
-    state.checks = checks
-    state.weights = weights
-    state.memo = memo
-    state.weekDone = weekDone
+
+    state.checks = checksRes.data || []
+    state.weights = weightsRes.data || []
+    state.memo = memoRes.data?.memo || ''
+    state.weekDone = (weekDoneRes.data || []).map(r => r.date)
     render()
   } finally {
     setLoading(false)
@@ -108,7 +108,14 @@ function renderExercises() {
       </label>
     `
     li.querySelector('input').addEventListener('change', async e => {
-      await saveCheck(state.today, i, e.target.checked)
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+      await sb.from('workout_checks').upsert({
+        user_id: user.id,
+        date: state.today,
+        exercise_index: i,
+        is_done: e.target.checked
+      }, { onConflict: 'user_id,date,exercise_index' })
       const existing = state.checks.find(c => c.exercise_index === i)
       if (existing) existing.is_done = e.target.checked
       else state.checks.push({ exercise_index: i, is_done: e.target.checked })
@@ -126,7 +133,8 @@ function renderExercises() {
 async function checkAllDone() {
   const allDone = state.checks.filter(c => c.is_done).length === EXERCISES.length
   if (allDone && !state.weekDone.includes(state.today)) {
-    await saveWeekDone(state.today)
+    const { data: { user } } = await sb.auth.getUser()
+    await sb.from('week_done').upsert({ user_id: user.id, date: state.today, is_done: true }, { onConflict: 'user_id,date' })
     state.weekDone.push(state.today)
     renderCalendar()
     showToast('오늘 운동 완료! 🎉')
@@ -137,7 +145,6 @@ function renderWeight() {
   const latest = state.weights[0]
   document.getElementById('weight-display').textContent =
     latest ? `현재 몸무게: ${latest.weight_kg} kg` : '몸무게를 기록해보세요'
-
   const tbody = document.getElementById('weight-tbody')
   tbody.innerHTML = ''
   state.weights.slice(0, 7).forEach(w => {
@@ -162,9 +169,8 @@ function renderCalendar() {
 
   document.getElementById('cal-title').textContent = `${year}년 ${month+1}월`
 
-  for (let i = 0; i < firstDay; i++) {
-    cal.appendChild(document.createElement('div'))
-  }
+  for (let i = 0; i < firstDay; i++) cal.appendChild(document.createElement('div'))
+
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
     const div = document.createElement('div')
@@ -174,12 +180,14 @@ function renderCalendar() {
     div.textContent = d
     div.addEventListener('click', async () => {
       state.today = dateStr
-      const [checks, memo] = await Promise.all([
-        loadChecks(dateStr),
-        loadMemo(dateStr),
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+      const [checksRes, memoRes] = await Promise.all([
+        sb.from('workout_checks').select('*').eq('user_id', user.id).eq('date', dateStr),
+        sb.from('workout_memos').select('memo').eq('user_id', user.id).eq('date', dateStr).maybeSingle(),
       ])
-      state.checks = checks
-      state.memo = memo
+      state.checks = checksRes.data || []
+      state.memo = memoRes.data?.memo || ''
       render()
     })
     cal.appendChild(div)
@@ -193,51 +201,50 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000)
 }
 
-// --- Event Bindings ---
-document.getElementById('btn-google').addEventListener('click', loginWithGoogle)
-
+// --- Events ---
 document.getElementById('btn-email-login').addEventListener('click', async () => {
-  const email = document.getElementById('input-email').value
+  const email = document.getElementById('input-email').value.trim()
   const pw = document.getElementById('input-password').value
-  try {
-    await loginWithEmail(email, pw)
-  } catch (e) {
-    showToast('로그인 실패: ' + e.message)
-  }
+  if (!email || !pw) { showToast('이메일과 비밀번호를 입력해주세요'); return }
+  const { error } = await sb.auth.signInWithPassword({ email, password: pw })
+  if (error) showToast('로그인 실패: ' + error.message)
 })
 
 document.getElementById('btn-signup').addEventListener('click', async () => {
-  const email = document.getElementById('input-email').value
+  const email = document.getElementById('input-email').value.trim()
   const pw = document.getElementById('input-password').value
-  try {
-    await signUp(email, pw)
-    showToast('회원가입 완료! 이메일을 확인해주세요.')
-  } catch (e) {
-    showToast('가입 실패: ' + e.message)
-  }
+  if (!email || !pw) { showToast('이메일과 비밀번호를 입력해주세요'); return }
+  const { error } = await sb.auth.signUp({ email, password: pw })
+  if (error) showToast('가입 실패: ' + error.message)
+  else showToast('회원가입 완료! 로그인 해주세요.')
 })
 
-document.getElementById('btn-logout').addEventListener('click', logout)
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await sb.auth.signOut()
+})
 
 document.getElementById('btn-save-weight').addEventListener('click', async () => {
   const val = parseFloat(document.getElementById('weight-input').value)
-  if (isNaN(val) || val < 20 || val > 300) {
-    showToast('올바른 몸무게를 입력해주세요')
-    return
-  }
-  await saveWeight(val)
+  if (isNaN(val) || val < 20 || val > 300) { showToast('올바른 몸무게를 입력해주세요'); return }
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return
+  const today = new Date().toISOString().split('T')[0]
+  await sb.from('weight_logs').insert({ user_id: user.id, date: today, weight_kg: val })
   document.getElementById('weight-input').value = ''
-  state.weights = await loadWeights()
+  const { data } = await sb.from('weight_logs').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(30)
+  state.weights = data || []
   renderWeight()
   showToast('몸무게 저장 완료!')
 })
 
 let memoTimer = null
-document.getElementById('memo-input').addEventListener('input', e => {
+document.getElementById('memo-input').addEventListener('input', async e => {
   clearTimeout(memoTimer)
   memoTimer = setTimeout(async () => {
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
     state.memo = e.target.value
-    await saveMemo(state.today, state.memo)
+    await sb.from('workout_memos').upsert({ user_id: user.id, date: state.today, memo: state.memo }, { onConflict: 'user_id,date' })
   }, 800)
 })
 
@@ -245,9 +252,14 @@ document.getElementById('btn-prev-month').addEventListener('click', async () => 
   const d = new Date(state.today + 'T00:00:00')
   d.setMonth(d.getMonth() - 1)
   state.today = d.toISOString().split('T')[0]
-  const [checks, memo] = await Promise.all([loadChecks(state.today), loadMemo(state.today)])
-  state.checks = checks
-  state.memo = memo
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return
+  const [checksRes, memoRes] = await Promise.all([
+    sb.from('workout_checks').select('*').eq('user_id', user.id).eq('date', state.today),
+    sb.from('workout_memos').select('memo').eq('user_id', user.id).eq('date', state.today).maybeSingle(),
+  ])
+  state.checks = checksRes.data || []
+  state.memo = memoRes.data?.memo || ''
   render()
 })
 
@@ -255,9 +267,14 @@ document.getElementById('btn-next-month').addEventListener('click', async () => 
   const d = new Date(state.today + 'T00:00:00')
   d.setMonth(d.getMonth() + 1)
   state.today = d.toISOString().split('T')[0]
-  const [checks, memo] = await Promise.all([loadChecks(state.today), loadMemo(state.today)])
-  state.checks = checks
-  state.memo = memo
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return
+  const [checksRes, memoRes] = await Promise.all([
+    sb.from('workout_checks').select('*').eq('user_id', user.id).eq('date', state.today),
+    sb.from('workout_memos').select('memo').eq('user_id', user.id).eq('date', state.today).maybeSingle(),
+  ])
+  state.checks = checksRes.data || []
+  state.memo = memoRes.data?.memo || ''
   render()
 })
 
