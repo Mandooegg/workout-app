@@ -23,62 +23,120 @@
 
   <!-- 앱 화면 -->
   <div id="app-screen" style="display:none">
-    <header>
-      <h1>💪 운동 스케줄</h1>
-      <button id="btn-logout" class="btn-danger btn-sm">로그아웃</button>
-    </header>
 
-    <!-- 날짜 -->
-    <div class="card">
-      <span id="today-label"></span>
-    </div>
+    <!-- 탭 네비게이션 -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="today">오늘</button>
+      <button class="tab-btn" data-tab="weekly">주간</button>
+      <button class="tab-btn" data-tab="weight">몸무게</button>
+      <button class="tab-btn" data-tab="routine">루틴</button>
+      <button id="btn-logout" class="btn-logout">로그아웃</button>
+    </nav>
 
-    <!-- 오늘의 운동 -->
-    <div class="card">
-      <div class="card-title">오늘의 운동</div>
-      <div class="progress-wrap">
-        <span id="progress-text">0 / 6 완료</span>
-        <div class="progress-bg"><div id="progress-bar"></div></div>
+    <!-- 오늘 탭 -->
+    <div id="tab-today" class="tab-pane active">
+      <div class="card">
+        <div class="today-header">
+          <span id="today-date" class="today-date"></span>
+          <span id="today-part" class="today-part"></span>
+        </div>
+        <div id="progress-wrap" class="progress-wrap">
+          <span id="progress-text">0 / 0 완료</span>
+          <div class="progress-bg"><div id="progress-bar" class="progress-bar"></div></div>
+        </div>
+        <ul id="exercise-list"></ul>
       </div>
-      <ul id="exercise-list"></ul>
+
+      <!-- 유산소 타이머 -->
+      <div class="card">
+        <div class="card-title">🏃 유산소 타이머 (50분)</div>
+        <div id="cardio-display" class="cardio-display">50:00</div>
+        <div class="progress-bg"><div id="cardio-bar" class="progress-bar cardio-bar-fill"></div></div>
+        <div class="cardio-btns">
+          <button id="btn-cardio-toggle" class="btn-primary">▶ 유산소 시작</button>
+          <button id="btn-cardio-reset" class="btn-ghost">초기화</button>
+        </div>
+      </div>
+
+      <!-- 메모 -->
+      <div class="card">
+        <div class="card-title">📝 운동 메모</div>
+        <textarea id="memo-input" placeholder="오늘의 운동 기록을 남겨보세요..."></textarea>
+      </div>
     </div>
 
-    <!-- 몸무게 기록 -->
-    <div class="card">
-      <div class="card-title">몸무게 기록</div>
-      <div id="weight-display">몸무게를 기록해보세요</div>
-      <div class="weight-input-row">
-        <input type="number" id="weight-input" placeholder="kg 입력" step="0.1" min="20" max="300">
-        <button id="btn-save-weight" class="btn-primary btn-sm">저장</button>
+    <!-- 주간 탭 -->
+    <div id="tab-weekly" class="tab-pane">
+      <div class="card">
+        <div class="week-nav">
+          <button id="btn-prev-week" class="btn-ghost btn-sm">◀</button>
+          <span id="week-label" class="week-label"></span>
+          <button id="btn-next-week" class="btn-ghost btn-sm">▶</button>
+        </div>
+        <div class="week-rate-wrap">
+          <span id="week-rate"></span>
+          <div class="progress-bg"><div id="week-rate-bar" class="progress-bar"></div></div>
+        </div>
+        <div id="week-grid" class="week-grid"></div>
       </div>
-      <table id="weight-table">
-        <thead><tr><th>날짜</th><th>몸무게</th></tr></thead>
-        <tbody id="weight-tbody"></tbody>
-      </table>
     </div>
 
-    <!-- 메모 -->
-    <div class="card">
-      <div class="card-title">운동 메모</div>
-      <textarea id="memo-input" placeholder="오늘의 운동 기록을 남겨보세요..."></textarea>
+    <!-- 몸무게 탭 -->
+    <div id="tab-weight" class="tab-pane">
+      <div class="card weight-summary">
+        <div class="w-stat">
+          <span class="w-label">현재</span>
+          <span id="w-current" class="w-value">-</span>
+        </div>
+        <div class="w-stat">
+          <span class="w-label">감량</span>
+          <span id="w-lost" class="w-value lost">-</span>
+        </div>
+        <div class="w-stat">
+          <span class="w-label">목표(66.5kg)</span>
+          <span id="w-togoal" class="w-value togoal">-</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">목표 달성률 (94kg → 66.5kg)</div>
+        <div class="progress-bg" style="margin-bottom:6px"><div id="w-goal-bar" class="progress-bar"></div></div>
+        <span id="w-goal-pct" style="font-size:0.82rem;color:var(--muted)"></span>
+      </div>
+      <div class="card">
+        <div class="card-title">몸무게 기록</div>
+        <div class="weight-input-row">
+          <input type="number" id="weight-input" placeholder="kg 입력" step="0.1" min="20" max="300">
+          <button id="btn-save-weight" class="btn-primary btn-sm">저장</button>
+        </div>
+        <table id="weight-table">
+          <thead><tr><th>날짜</th><th>몸무게</th></tr></thead>
+          <tbody id="weight-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- 달력 -->
-    <div class="card">
-      <div class="cal-header">
-        <button id="btn-prev-month" class="btn-ghost btn-sm">◀</button>
-        <span id="cal-title"></span>
-        <button id="btn-next-month" class="btn-ghost btn-sm">▶</button>
+    <!-- 루틴 탭 -->
+    <div id="tab-routine" class="tab-pane">
+      <div class="card">
+        <div class="card-title">5분할 머신 운동 루틴</div>
+        <div id="routine-wrap"></div>
       </div>
-      <div class="cal-days-label">
-        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      <div class="card">
+        <div class="card-title">유산소 강도 가이드</div>
+        <table class="cardio-guide">
+          <thead><tr><th>요일</th><th>강도</th><th>방법</th></tr></thead>
+          <tbody>
+            <tr><td>화·목</td><td><span class="badge low">저강도</span></td><td>인클라인 워킹 50분</td></tr>
+            <tr><td>월·수·금</td><td><span class="badge mid">중강도</span></td><td>러닝 or 사이클 50분</td></tr>
+            <tr><td>토</td><td><span class="badge high">고강도</span></td><td>HIIT 20분 + 워킹</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div id="calendar"></div>
     </div>
+
   </div>
 
   <div id="toast"></div>
-
   <script src="app.js"></script>
 </body>
 </html>
