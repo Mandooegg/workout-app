@@ -136,6 +136,33 @@
 
   </div>
 
+  <!-- 운동 정보 모달 -->
+  <div id="exercise-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-title" class="modal-title"></h2>
+          <span id="modal-target" class="modal-target"></span>
+        </div>
+        <button id="modal-close" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-section-title">📋 수행 방법</div>
+          <ol id="modal-steps" class="modal-steps"></ol>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">💡 주의사항</div>
+          <p id="modal-tips" class="modal-tips"></p>
+        </div>
+        <a id="modal-youtube" class="modal-youtube-btn" target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#ff0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+          YouTube에서 영상 보기
+        </a>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
   <script src="app.js"></script>
 </body>
